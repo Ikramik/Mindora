@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import random
 
@@ -29,10 +29,10 @@ async def health_check():
 ###DUMMY ENDPOINTS FOR TESTING PURPOSES###
 @app.get("/api/predict-dummy")
 async def get_dummy_brain_data():
-    # 1. Randomly select a simulated patient state
+    # Randomly select a simulated patient state
     scenario = random.choice(["resting", "cognitive_load", "deep_focus"])
     
-    # 2. Generate data based on the scenario
+    # Generate data based on the scenario
     if scenario == "resting":
         # Low brain activity (mostly blue UI)
         activation_data = [round(random.uniform(0.0, 0.3), 3) for _ in range(100)]
@@ -48,4 +48,20 @@ async def get_dummy_brain_data():
         "model": "dummy-v1", 
         "scenario": scenario, 
         "data": activation_data
+    }
+
+# --- OUR NEW VIDEO UPLOAD ENDPOINT ---
+@app.post("/api/upload-video")
+async def upload_video(file: UploadFile = File(...)):
+    # In the future, this is where we will send the file to the AI.
+    # For today, we just want to prove the backend successfully received the heavy .mp4 file!
+    
+    # Read how big the file is
+    file_bytes = await file.read()
+    file_size_mb = round(len(file_bytes) / (1024 * 1024), 2)
+    
+    return {
+        "status": "success",
+        "message": f"Successfully received {file.filename}",
+        "size_mb": file_size_mb
     }

@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF } from '@react-three/drei';
-import { useRef, Suspense, useState } from 'react';
+import { useRef, Suspense, useState, ChangeEvent } from 'react';
 import * as THREE from 'three';
 
 //Temporary 3D object
@@ -36,65 +36,118 @@ function BrainModel({ heatLevel }: { heatLevel: number }){
 
 
 function App() {
-  //React State to hold our calculated brain activity level
   const [activationScore, setActivationScore] = useState<number>(0);
-  const [isFetching, setIsFetching] = useState<boolean>(false);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadMessage, setUploadMessage] = useState<string>("");
 
-  // The function that talks to the Python FastAPI server!
-  const fetchBrainData = async () => {
-    setIsFetching(true);
+  //NEW FILE UPLOAD LOGIC
+  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadMessage(`Uploading ${file.name}...`);
+
+    // We pack the file into a special FormData object to send over HTTP
+    const formData = new FormData();
+    formData.append("file", file);
+
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/predict-dummy');
-      const json = await response.json();
+      // Send the video to FastAPI
+      const uploadRes = await fetch('http://127.0.0.1:8000/api/upload-video', {
+        method: 'POST',
+        body: formData,
+      });
+      const uploadJson = await uploadRes.json();
+      setUploadMessage(`${uploadJson.message} (${uploadJson.size_mb} MB)`);
+
+      //Automatically trigger the dummy AI simulation after upload!
+      const simRes = await fetch('http://127.0.0.1:8000/api/predict-dummy');
+      const simJson = await simRes.json();
       
-      // json.data is our array of 100 random numbers. Let's calculate the average
-      const dataArray: number[] = json.data;
+      const dataArray: number[] = simJson.data;
       const sum = dataArray.reduce((acc, curr) => acc + curr, 0);
-      const average = sum / dataArray.length; // Will be a number between 0 and 1
-      
-      setActivationScore(average);
+      setActivationScore(sum / dataArray.length);
+
     } catch (error) {
-      console.error("Failed to fetch from backend:", error);
+      console.error("Upload failed:", error);
+      setUploadMessage("Error uploading video.");
     } finally {
-      setIsFetching(false);
+      setIsUploading(false);
     }
   };
   return (
+
     <div style={{ height: '100vh', width: '100vw', backgroundColor: '#111827', position: 'relative' }}>
-      
-      {/* UI Overlay for our Button and Data */}
+      {/* UI Overlay */}
       <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, color: 'white', fontFamily: 'sans-serif' }}>
-        <h1 style={{ fontSize: '24px', margin: '0 0 10px 0' }}>Mindora Analysis Hub</h1>
-        <button 
-          onClick={fetchBrainData}
-          disabled={isFetching}
-          style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: '#4f46e5', color: 'white', border: 'none', borderRadius: '5px' }}
-        >
-          {isFetching ? 'Running AI Model...' : 'Run Simulation'}
-        </button>
+        <h1 style={{ fontSize: '24px', margin: '0 0 10px 0' }}>Mindora Analysis Hub</h1>   
+
+        {/* Sleek Custom Upload Button */}
+        <label style={{ display: 'inline-block',padding: '10px 20px', 
+          cursor: isUploading ? 'wait' : 'pointer', 
+          backgroundColor: isUploading ? '#6b7280' : '#060159', 
+          color: 'white', borderRadius: '5px', fontWeight: 'bold'    }}>
+          {isUploading ? 'Processing Media...' : 'Upload Commercial (.mp4)'}
+          <input 
+            type="file" 
+            accept="video/mp4,video/x-m4v,video/*" 
+            onChange={handleFileUpload} 
+            disabled={isUploading}
+            style={{ display: 'none' }} // This hides the ugly default browser input!
+          />
+
+        </label>
+
+
+
+        {/* Status Messages */}
+
+        {uploadMessage && <p style={{ marginTop: '10px', fontSize: '14px', color: '#9ca3af' }}>{uploadMessage}</p>}
+
+        
+
         <p style={{ marginTop: '15px', fontSize: '18px' }}>
+
           Global Activation Level: <strong style={{ color: activationScore > 0.6 ? '#ef4444' : '#3b82f6' }}>{(activationScore * 100).toFixed(1)}%</strong>
+
         </p>
+
       </div>
 
-      {/* Attribution */}
+
+
       <div style={{ position: 'absolute', bottom: 10, right: 10, color: 'gray', zIndex: 10, fontFamily: 'sans-serif', fontSize: '12px' }}>
+
         3D Model: "human-brain" by Yash_Dandavate (CC-BY)
+
       </div>
+
+
 
       <Canvas camera={{ position: [0, 0, 5] }}>
+
         <ambientLight intensity={1.5} />
+
         <directionalLight position={[10, 10, 10]} intensity={2} />
+
         <directionalLight position={[-10, -10, -10]} intensity={1} />
+
         
+
         <Suspense fallback={null}>
-          {/* We pass the state down to the 3D model! */}
+
           <BrainModel heatLevel={activationScore} />
+
         </Suspense>
 
         <OrbitControls enableZoom={true} />
+
       </Canvas>
+
     </div>
+
   );
 }
+
 export default App;
