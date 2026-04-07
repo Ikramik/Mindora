@@ -5,10 +5,10 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from moviepy import VideoFileClip
 
-#initializing Mindora
+#initializing Izri AI
 
 app = FastAPI(
-    title="Mindora API",
+    title="Izri AI API",
     description="Backend for TRIBE V2 neural response prediction",
     version="1.0.0",
 )
@@ -25,7 +25,7 @@ os.makedirs("temp_uploads", exist_ok=True)
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the Mindora API!"}
+    return {"message": "Welcome to the Izri AI API!"}
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "model_loaded": False}

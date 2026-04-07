@@ -81,7 +81,7 @@ function App() {
     <div style={{ height: '100vh', width: '100vw', backgroundColor: '#111827', position: 'relative' }}>
       {/* UI Overlay */}
       <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, color: 'white', fontFamily: 'sans-serif' }}>
-        <h1 style={{ fontSize: '24px', margin: '0 0 10px 0' }}>Mindora Analysis Hub</h1>   
+        <h1 style={{ fontSize: '24px', margin: '0 0 10px 0' }}>Izri AI Analysis Hub</h1>   
 
         {/* Sleek Custom Upload Button */}
         <label style={{ display: 'inline-block',padding: '10px 20px', 
