@@ -45,15 +45,14 @@ function BrainModel({ isAnalyzing, insights }: { isAnalyzing: boolean, insights:
 
         for (let i = 0; i < vertexCount; i++) {
           if (!isAnalyzing) {
-            // Resting state: Deep Metallic Slate (Provides massive contrast against the white background)
             color.setHex(0x334155);
           } else {
             const val = activations[i % activations.length];
             const normalized = (val - minVal) / (maxVal - minVal || 1);
 
-            if (normalized > 0.8) color.setHex(0xf43f5e); // Rose Red
-            else if (normalized > 0.55) color.setHex(0xf59e0b); // Amber Orange
-            else color.setHex(0x334155); // Deep Slate
+            if (normalized > 0.8) color.setHex(0xf43f5e); 
+            else if (normalized > 0.55) color.setHex(0xf59e0b); 
+            else color.setHex(0x334155); 
           }
           colors[i * 3] = color.r;
           colors[i * 3 + 1] = color.g;
@@ -134,7 +133,9 @@ export default function App() {
   const [showRealData, setShowRealData] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("System idle. Ready for media ingestion.");
   
+  // CORRECTED: The state is properly defined inside the component with globalScore included!
   const [insights, setInsights] = useState({
+    globalScore: 0, 
     vmPFC: { level: "---", color: "#cbd5e1", desc: "---" },
     amygdala: { level: "---", color: "#cbd5e1", desc: "---" },
     hippocampus: { level: "---", color: "#cbd5e1", desc: "---" }
@@ -156,7 +157,12 @@ export default function App() {
       const minVal = Math.min(...rawData);
       const normalize = (val: number) => (val - minVal) / (maxVal - minVal || 1);
 
+      // Calculate the global Izri Score (0-100)
+      const globalAverage = rawData.reduce((a, b) => a + b, 0) / rawData.length;
+      const izriScore = Math.round(normalize(globalAverage) * 100);
+
       setInsights({
+        globalScore: izriScore,
         vmPFC: getInsightText("vmPFC", normalize(getRegionAverage(rawData, BRAIN_REGIONS.vmPFC.start, BRAIN_REGIONS.vmPFC.end))),
         amygdala: getInsightText("Amygdala", normalize(getRegionAverage(rawData, BRAIN_REGIONS.amygdala.start, BRAIN_REGIONS.amygdala.end))),
         hippocampus: getInsightText("Hippocampus", normalize(getRegionAverage(rawData, BRAIN_REGIONS.hippocampus.start, BRAIN_REGIONS.hippocampus.end)))
@@ -219,6 +225,32 @@ export default function App() {
           {isUploading ? 'Processing...' : 'Upload Commercial'}
           <input type="file" accept="video/mp4" onChange={handleFileUpload} disabled={isUploading} style={{ display: 'none' }} />
         </label>
+      </div>
+
+      {/* THE NEW IZRI SCORE GAUGE - FLOATING LEFT */}
+      <div style={{ 
+        position: 'absolute',
+        top: '100px',
+        left: '40px',
+        padding: '24px', 
+        background: 'rgba(255, 255, 255, 0.85)', 
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255, 255, 255, 1)', 
+        borderRadius: '16px',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.08)', 
+        textAlign: 'center',
+        zIndex: 10,
+        width: '180px',
+        opacity: showRealData ? 1 : 0.3, 
+        transition: 'opacity 0.5s'
+      }}>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '700' }}>Global Izri Score</h3>
+        <div style={{ fontSize: '48px', fontWeight: '900', color: '#0f172a', letterSpacing: '-2px' }}>
+          {insights.globalScore}<span style={{ fontSize: '16px', color: '#94a3b8', fontWeight: '600' }}>/100</span>
+        </div>
+        <p style={{ margin: '10px 0 0 0', fontSize: '12px', color: '#10b981', fontWeight: '700' }}>
+          {showRealData ? 'Optimal Engagement' : 'Awaiting Data'}
+        </p>
       </div>
 
       {/* 3D VIEWPORT */}
