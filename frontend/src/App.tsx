@@ -5,6 +5,7 @@ import { useRef, Suspense, useState, useMemo, type ChangeEvent } from 'react';
 import * as THREE from 'three';
 import { Activity, Brain, UploadCloud } from 'lucide-react';
 
+// We keep this just as a fallback/placeholder, but we won't use it for live analysis!
 import realBrainData from '../izri_brain_data.json';
 
 const BRAIN_REGIONS = {
@@ -25,15 +26,20 @@ function getInsightText(average: number) {
 }
 
 // --- 3D CLINICAL BRAIN ---
-function BrainModel({ isAnalyzing, insights }: { isAnalyzing: boolean, insights: any }) {
+// 1. Notice how we added `liveData` to the props here!
+function BrainModel({ isAnalyzing, insights, liveData }: { isAnalyzing: boolean, insights: any, liveData: number[] }) {
   const { scene } = useGLTF('/human-brain.glb');
   const brainRef = useRef<THREE.Group>(null!);
 
   const paintedBrain = useMemo(() => {
     const object = scene.clone();
-    const activations = realBrainData.activation_data;
-    const maxVal = Math.max(...activations);
-    const minVal = Math.min(...activations);
+    
+    // 2. THIS IS THE MAGIC! 
+    // If we have liveData, use it. Otherwise, fall back to the old JSON so the app doesn't crash.
+    const activations = liveData.length > 0 ? liveData : realBrainData.activation_data;
+    
+const maxVal = activations.reduce((a, b) => Math.max(a, b), -Infinity);
+const minVal = activations.reduce((a, b) => Math.min(a, b), Infinity);
 
     object.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
@@ -72,7 +78,7 @@ function BrainModel({ isAnalyzing, insights }: { isAnalyzing: boolean, insights:
       }
     });
     return object;
-  }, [scene, isAnalyzing]);
+  }, [scene, isAnalyzing, liveData]); // <- Added liveData to the dependency array
 
   useFrame((state) => {
     if (brainRef.current) {
@@ -133,7 +139,9 @@ export default function App() {
   const [showRealData, setShowRealData] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("System idle. Ready for media ingestion.");
   
-  // CORRECTED: The state is properly defined inside the component with globalScore included!
+  // 3. The Hook is now safely inside the App component!
+  const [liveBrainData, setLiveBrainData] = useState<number[]>([]);
+  
   const [insights, setInsights] = useState({
     globalScore: 0, 
     vmPFC: { level: "---", color: "#cbd5e1", desc: "---" },
@@ -150,15 +158,24 @@ export default function App() {
     setUploadMessage(`Analyzing ${file.name}...`);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000)); 
-      
-      const rawData = realBrainData.activation_data;
-      const maxVal = Math.max(...rawData);
-      const minVal = Math.min(...rawData);
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload-video`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Backend failed");
+      const data = await response.json();
+
+      if (data.status === "error") throw new Error(data.message);
+
+      const rawData = data.activation_data;
+      const maxVal = rawData.reduce((a: number, b: number) => Math.max(a, b), -Infinity);
+      const minVal = rawData.reduce((a: number, b: number) => Math.min(a, b), Infinity);
       const normalize = (val: number) => (val - minVal) / (maxVal - minVal || 1);
 
-      // Calculate the global Izri Score (0-100)
-      const globalAverage = rawData.reduce((a, b) => a + b, 0) / rawData.length;
+      const globalAverage = rawData.reduce((a: number, b: number) => a + b, 0) / rawData.length;
       const izriScore = Math.round(normalize(globalAverage) * 100);
 
       setInsights({
@@ -168,10 +185,15 @@ export default function App() {
         hippocampus: getInsightText(normalize(getRegionAverage(rawData, BRAIN_REGIONS.hippocampus.start, BRAIN_REGIONS.hippocampus.end)))
       });
 
+      // 4. Actually save the incoming RunPod data to the state!
+      setLiveBrainData(rawData);
+      
       setUploadMessage("Cortical map successfully generated.");
       setShowRealData(true);
+      
     } catch (error) {
-      setUploadMessage("Connection Error.");
+      console.error(error);
+      setUploadMessage("Neural Pipeline Connection Error.");
     } finally {
       setIsUploading(false);
     }
@@ -261,7 +283,9 @@ export default function App() {
           <directionalLight position={[-10, -10, -5]} intensity={1} color="#f8fafc" />
           
           <Suspense fallback={null}>
-            <BrainModel isAnalyzing={showRealData} insights={insights} />
+            {/* 5. Finally, we pass the liveData state directly into the 3D Brain! */}
+            <BrainModel isAnalyzing={showRealData} insights={insights} liveData={liveBrainData} />
+            
             <Environment preset="studio" />
             <Grid infiniteGrid fadeDistance={25} sectionColor="#cbd5e1" cellColor="#f1f5f9" position={[0, -2.5, 0]} sectionThickness={1.0} />
             <EffectComposer>
